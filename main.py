@@ -57,17 +57,74 @@ Pass 2 — two genuine revisions of the chosen line C:
    know it reads." (67 chars) — shorter, but "when it matters" is
    vaguer than "on urgent documents" and the judge rewards absurdly
    specific detail; kept revision 1. Final line is 74 characters.
+
+Pass 3 — a fresh look before locking the entry (this pass):
+Before touching the code I re-opened the line itself, because a
+structural pass that never questions the payload is just tidying.
+Two new phrasings of the same joke were drafted and weighed:
+
+G. "My printer waits until the document is urgent to jam, which tells
+   me it can read." (82 chars)
+   REJECTED: same joke, worse rhythm. Front-loading "waits until"
+   delays the verb, and "which tells me" is softer than "which is
+   how I know" — the chosen line's confidence is part of the laugh.
+
+H. "It only jams on urgent documents, which is how I know my printer
+   can read." (75 chars)
+   REJECTED: moving "my printer" to the end buries the subject and
+   makes the first clause float without an owner; the grievance
+   needs a named culprit up front. Also one char longer.
+
+Conclusion: the 74-char line survives both challenges unchanged.
+The rest of this pass therefore worked on the code around it: the
+gate (1-200 chars, single line) was previously only described in
+prose, so the program now checks it itself via validate_line()
+before writing, and the output path resolution lives in its own
+output_path() function so the env-var fallback is stated in
+exactly one place. Behaviour is otherwise identical: the same
+line, the same file, the same trailing newline.
 """
 
 import os
 
 LINE = "My printer only jams on urgent documents, which is how I know it can read."
 
+# The bounty's hard gate: one line of UTF-8 text, 1-200 characters.
+MIN_CHARS = 1
+MAX_CHARS = 200
+
+
+def validate_line(line: str) -> None:
+    """Fail loudly if the entry line ever drifts outside the gate.
+
+    The line is a fixed constant today, but the check is cheap
+    insurance: if a future edit makes it empty, over-long, or
+    multi-line, the program should refuse to write a bad entry
+    rather than submit one silently.
+    """
+    if not MIN_CHARS <= len(line) <= MAX_CHARS:
+        raise ValueError(
+            f"entry line is {len(line)} chars; gate is {MIN_CHARS}-{MAX_CHARS}"
+        )
+    if "\n" in line or "\r" in line:
+        raise ValueError("entry must be exactly one line")
+
+
+def output_path() -> str:
+    """Where the entry file goes.
+
+    $MAKEFUN_OUTPUT_DIR/entry.txt when the harness sets the variable,
+    otherwise /output/entry.txt.
+    """
+    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
+    return os.path.join(out_dir, "entry.txt")
+
 
 def main() -> None:
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "entry.txt"), "w", encoding="utf-8") as f:
+    validate_line(LINE)
+    path = output_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         f.write(LINE + "\n")
 
 
